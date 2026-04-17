@@ -56,23 +56,22 @@ if st.session_state.ser is not None:
 else:
     st.sidebar.error(f"{port}를 찾을 수 없습니다.")
 
-
+ 
 # =========================================================
 # [구역 3] 상태 초기화
 # =========================================================
 
-if "raw_data" not in st.session_state:
-    st.session_state.raw_data = []
+if "sonar_sensor_data" not in st.session_state:
+    st.session_state.sonar_sensor_data = []
 
-if "angle" not in st.session_state:
-    st.session_state.angle = 90
+if "current_distance" not in st.session_state:
+    st.session_state.current_distance = None
 
-if "last_sent_angle" not in st.session_state:
-    st.session_state.last_sent_angle = 90
+if "sound_sensor_data" not in st.session_state:
+    st.session_state.sound_sensor_data = []
 
-if "current_light" not in st.session_state:
-    st.session_state.current_light = 0
-
+if "current_decibel" not in st.session_state:
+    st.session_state.current_decibel = None
 
 # =========================================================
 # [구역 4] AI 에이전트 및 도구(Tools) 정의
@@ -103,11 +102,50 @@ if "chat_session" not in st.session_state:
         ),
     )
 
-
 # =========================================================
 # [구역 5] 데이터 수집
 # =========================================================
 
+def fetch_data():
+    ser = st.session_state.ser
+    while ser and ser.is_open and ser.in_waiting > 0:
+        try:
+            message = ser.readline().decode("utf-8").strip() 
+            payload = json.loads(message)
+
+            sensor_type = payload["type"]
+
+            if sensor_type == "sonar_sensor":
+                distance = payload["distance"]
+                st.session_state.sonar_sensor_data.append({
+                        "time": datetime.now(),
+                        "distance": distance,
+                })
+
+                st.session_state.current_distance = distance
+
+            if sensor_type == "sound_sensor":
+                decibel = payload["decibel"]
+                st.session_state.sound_sensor_data.append({
+                        "time": datetime.now(),
+                        "decibel": decibel,
+                })
+
+                st.session_state.current_decibel = decibel
+
+
+        except json.JSONDecodeError as e:
+                    print(e)
+        except Exception as e:
+            print(e)
+
+
+with st.sidebar:
+    @st.fragment(run_every="0.2s")
+    def collect_data():
+        fetch_data()
+
+    collect_data()
 
 # =========================================================
 # [구역 6] 페이지 내비게이션 및 앱 실행
